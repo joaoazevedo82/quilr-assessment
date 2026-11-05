@@ -32,7 +32,7 @@ function isAdminCall(m: any) {
   if (m?.method !== 'tools/call') return false
   const name = m.params?.name
   // a name that isn't a plain string is refused too, the downstream might coerce it
-  return typeof name !== 'string' || name.startsWith('admin_')
+  return typeof name !== 'string' || name.trimStart().toLowerCase().startsWith('admin_')
 }
 
 function forward(req: IncomingMessage, res: ServerResponse, body?: string) {
