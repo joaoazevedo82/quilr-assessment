@@ -63,3 +63,32 @@ How it works:
 - The `admin_` check ignores case and leading spaces, and a tool name that isn't a plain string is treated as an admin call for non admins. Denials are logged with the token subject.
 - A client that drops the connection halfway through sending a body just gets ignored. Early on this crashed the whole gateway.
 - `tools/list` is passed through untouched like the task says, so viewers still see the admin tools listed. Hiding them would be easy to add.
+
+## Task 3: PII redaction on a streamed LLM response
+
+`task3-pii-stream/` has the gateway, the redactor and a mock LLM that streams OpenAI style chunks with an email, an SSN and card numbers mixed into the text.
+
+```
+npm run task3:mock       # mock llm on :8091
+npm run task3:gateway    # gateway on :8090
+
+curl -N localhost:8090/v1/chat/completions -d '{"model":"x","stream":true,"messages":[]}'
+```
+
+To use a real provider instead, set `UPSTREAM_URL` (for example `https://api.openai.com`) and `UPSTREAM_API_KEY`. The request body is forwarded as is.
+
+The tricky part is that PII gets split across chunks. `jane.roe@ac` arrives in one delta and `me-corp.com` in the next, so redacting each chunk on its own leaks most of it. Holding back a fixed number of characters works, but adds a lot of delay and is easy to get subtly wrong.
+
+What `redact.ts` does instead:
+
+- After each chunk it scans the buffer, replaces complete matches, and sends everything up to the point where something at the end could still turn into a match. Only that tail stays behind. In normal prose that's the word currently being written, so the client sees text almost as fast as the model produces it.
+- A match touching the end is held too, since `a@b.co` could still become `a@b.com`.
+- One already sent character stays in the buffer, so the `(?<!\d)` checks still know what came before.
+- The buffer can never grow past about 330 characters (the longest possible email), so memory is flat however long the response is.
+- When the stream finishes, the tail is redacted and sent. If the upstream breaks in the middle, the tail is dropped instead and the client gets an error event, because it might be half a card number.
+
+I checked it by comparing the streamed output with redacting the whole text in one go, over 143 sample texts with every 2 way split, one character per chunk, and 300 random chunkings each (about 52k runs, no differences). It does about 6 MB/s, which is a long way above what any model streams.
+
+The gateway itself parses the SSE stream with `eventsource-parser`, keeps one redactor per choice (`n > 1` interleaves them), respects backpressure, and aborts the upstream request when the client disconnects. Non streaming responses are redacted in one pass.
+
+Things I left out: no Luhn check on card numbers (so a 16 digit order id gets redacted too, which seemed the safer mistake), no phone numbers or names, and tool call arguments aren't scanned, only `delta.content`.
