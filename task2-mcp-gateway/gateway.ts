@@ -5,6 +5,8 @@ import { jwtVerify } from 'jose'
 const port = Number(process.env.PORT ?? 8080)
 const downstream = process.env.DOWNSTREAM_URL ?? 'http://localhost:8081'
 const secret = new TextEncoder().encode(process.env.JWT_SECRET ?? 'dev-secret')
+const issuer = process.env.JWT_ISSUER ?? 'demo-issuer'
+const audience = process.env.JWT_AUDIENCE ?? 'mcp-gateway'
 const maxBody = 1024 * 1024
 
 if (!process.env.JWT_SECRET) console.warn('JWT_SECRET is not set, using dev-secret. Anyone can mint tokens, so keep this local')
@@ -19,7 +21,7 @@ async function roleOf(auth?: string) {
   const token = auth?.match(/^Bearer (\S+)$/i)?.[1]
   if (!token) return
   try {
-    const { payload } = await jwtVerify(token, secret, { algorithms: ['HS256'] })
+    const { payload } = await jwtVerify(token, secret, { algorithms: ['HS256'], issuer, audience })
     return typeof payload.role === 'string' ? payload.role : undefined
   } catch {
     return
