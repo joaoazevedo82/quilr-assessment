@@ -15,10 +15,13 @@
     "task1": "node task1-mcp-server/server.ts",
     "task2:downstream": "node task2-mcp-gateway/downstream.ts",
     "task2:gateway": "node task2-mcp-gateway/gateway.ts",
-    "task2:token": "node task2-mcp-gateway/token.ts"
+    "task2:token": "node task2-mcp-gateway/token.ts",
+    "task3:mock": "node task3-pii-stream/mock-llm.ts",
+    "task3:gateway": "node task3-pii-stream/gateway.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
+    "eventsource-parser": "^4.1.3",
     "jose": "^6.2.15",
     "zod": "^4.6.7"
   }
