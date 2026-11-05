@@ -8,8 +8,8 @@ const timeoutMs = Number(process.env.UPSTREAM_TIMEOUT_MS ?? 3000)
 const defaultMaxTokens = 1024
 const maxBody = 1024 * 1024
 const providers = [
-  { name: 'primary', url: process.env.PRIMARY_URL ?? 'http://localhost:8101', key: process.env.PRIMARY_API_KEY, model: process.env.PRIMARY_MODEL },
-  { name: 'secondary', url: process.env.SECONDARY_URL ?? 'http://localhost:8102', key: process.env.SECONDARY_API_KEY, model: process.env.SECONDARY_MODEL },
+  { name: 'primary', url: process.env.PRIMARY_URL ?? 'http://localhost:8101', key: process.env.PRIMARY_API_KEY, model: process.env.PRIMARY_MODEL, until: 0 },
+  { name: 'secondary', url: process.env.SECONDARY_URL ?? 'http://localhost:8102', key: process.env.SECONDARY_API_KEY, model: process.env.SECONDARY_MODEL, until: 0 },
 ]
 
 // every error leaves in this one shape, upstream bodies and stack traces only go to the log
@@ -18,7 +18,7 @@ function fail(res: ServerResponse, id: string, status: number, code: string, mes
   res.end(JSON.stringify({ error: { type: 'gateway_error', code, message, request_id: id } }))
 }
 
-type Attempt = { status: number; json: any } | { failed: string } | { aborted: true }
+type Attempt = { status: number; json: any } | { failed: string; backoff?: number } | { aborted: true }
 
 async function attempt(p: (typeof providers)[number], body: object, client: AbortSignal): Promise<Attempt> {
   // the timeout covers reading the body too, and it really closes the upstream request instead of leaving it running
@@ -30,7 +30,9 @@ async function attempt(p: (typeof providers)[number], body: object, client: Abor
       body: JSON.stringify(p.model ? { ...body, model: p.model } : body),
       signal,
     })
-    if (res.status === 429 || res.status >= 500) return { failed: `answered ${res.status}: ${(await res.text()).slice(0, 200)}` }
+    if (res.status === 429 || res.status >= 500) {
+      return { failed: `answered ${res.status}: ${(await res.text()).slice(0, 200)}`, backoff: Number(res.headers.get('retry-after')) || undefined }
+    }
     return { status: res.status, json: await res.json() }
   } catch (err) {
     if (client.aborted) return { aborted: true }
@@ -75,12 +77,17 @@ async function handle(req: IncomingMessage, res: ServerResponse, id: string) {
   const ac = new AbortController()
   res.on('close', () => ac.abort())
 
-  for (const p of providers) {
+  for (const [i, p] of providers.entries()) {
+    // a provider that just failed is skipped for a while so each request doesn't wait out its timeout again.
+    // the last one is always tried, there is nothing left to fall back to
+    if (Date.now() < p.until && i < providers.length - 1) continue
     const r = await attempt(p, body, ac.signal)
     // the provider may already have spent tokens on it, so an abandoned request stays counted
     if ('aborted' in r) return
     if ('failed' in r) {
-      console.error(`${id} ${p.name} ${r.failed.replace(/\s+/g, ' ')}`)
+      const backoff = Math.min(r.backoff ?? 10, 60)
+      p.until = Date.now() + backoff * 1000
+      console.error(`${id} ${p.name} ${r.failed.replace(/\s+/g, ' ')}, skipping it for ${backoff} s`)
       continue
     }
     if (r.status >= 400) {
