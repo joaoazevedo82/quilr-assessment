@@ -11,7 +11,8 @@
     "typescript": "^7.0.2"
   },
   "scripts": {
-    "check": "tsc"
+    "check": "tsc",
+    "task1": "node task1-mcp-server/server.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
