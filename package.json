@@ -17,7 +17,8 @@
     "task2:gateway": "node task2-mcp-gateway/gateway.ts",
     "task2:token": "node task2-mcp-gateway/token.ts",
     "task3:mock": "node task3-pii-stream/mock-llm.ts",
-    "task3:gateway": "node task3-pii-stream/gateway.ts"
+    "task3:gateway": "node task3-pii-stream/gateway.ts",
+    "task4:tenant": "node task4-rate-limit/add-tenant.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
