@@ -12,10 +12,14 @@
   },
   "scripts": {
     "check": "tsc",
-    "task1": "node task1-mcp-server/server.ts"
+    "task1": "node task1-mcp-server/server.ts",
+    "task2:downstream": "node task2-mcp-gateway/downstream.ts",
+    "task2:gateway": "node task2-mcp-gateway/gateway.ts",
+    "task2:token": "node task2-mcp-gateway/token.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
+    "jose": "^6.2.15",
     "zod": "^4.6.7"
   }
 }
