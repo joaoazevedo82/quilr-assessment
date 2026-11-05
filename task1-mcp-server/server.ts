@@ -19,7 +19,7 @@ const tools = {
     description: 'Issue a refund to a customer',
     schema: z.strictObject({
       customer_id: customerId,
-      amount: z.number().positive(),
+      amount: z.number().positive().multipleOf(0.01).max(1_000_000),
       reason: z.string().trim().min(10).max(500),
     }),
   },
