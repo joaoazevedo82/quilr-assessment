@@ -67,10 +67,15 @@ createServer(async (req, res) => {
 
   const chunks: Buffer[] = []
   let size = 0
-  for await (const c of req) {
-    size += c.length
-    if (size > maxBody) return reply(res, 413, rpcError(null, -32600, 'Request body too large'))
-    chunks.push(c)
+  try {
+    for await (const c of req) {
+      size += c.length
+      if (size > maxBody) return reply(res, 413, rpcError(null, -32600, 'Request body too large'))
+      chunks.push(c)
+    }
+  } catch {
+    // client hung up mid upload, nobody is left to answer
+    return
   }
 
   let body
