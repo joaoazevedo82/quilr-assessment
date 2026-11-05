@@ -67,5 +67,14 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   return { content: [{ type: 'text', text: JSON.stringify(refund) }] }
 })
 
-await server.connect(new StdioServerTransport())
+const transport = new StdioServerTransport()
+
+// the sdk drops lines it can't parse, json-rpc wants an error back with a null id
+server.onerror = (err) => {
+  log(`${err.name}: ${err.message.replace(/\s+/g, ' ').slice(0, 200)}`)
+  if (err instanceof SyntaxError) transport.send({ jsonrpc: '2.0', id: null, error: { code: ErrorCode.ParseError, message: 'Parse error' } } as never)
+  else if (err.name === 'ZodError') transport.send({ jsonrpc: '2.0', id: null, error: { code: ErrorCode.InvalidRequest, message: 'Invalid Request' } } as never)
+}
+
+await server.connect(transport)
 log('listening on stdio')
