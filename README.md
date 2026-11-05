@@ -21,8 +21,8 @@ Or with the inspector: `npx @modelcontextprotocol/inspector node task1-mcp-serve
 
 Some notes:
 
-- Validation is zod with strict objects, so unknown keys are rejected too. `amount` has to be a positive finite number (`1e999` parses to Infinity and gets rejected), `reason` is trimmed before the 10 character check so ten spaces don't count.
-- Bad input comes back as a JSON-RPC error with code `-32602`, with the zod issues in `error.data`. An unknown tool name is `-32602` as well.
+- Validation is zod with strict objects, so unknown keys are rejected too. `amount` has to be positive, in whole cents and at most 1,000,000 (`1e999` parses to Infinity and gets rejected too), `reason` is trimmed before the 10 character check so ten spaces don't count.
+- Bad input comes back as a JSON-RPC error with code `-32602`, with the zod issues in `error.data`. An unknown tool name is `-32602` as well, and so is a broken `params` object (say `arguments: null`), which the SDK would otherwise answer with `-32603`.
 - I used the low level `Server` class instead of `McpServer.registerTool`. With `registerTool` the SDK turns validation failures into a normal result with `isError: true`, which isn't what the task asks for.
 - A well formed id that doesn't exist is a tool error (`isError: true`), not a protocol error, since the request itself was fine.
 - stdout only ever carries JSON-RPC. Logs go to stderr, and `console.log` is pointed at stderr at startup in case some dependency prints.
@@ -55,10 +55,11 @@ As a viewer that returns `{"jsonrpc":"2.0","id":1,"error":{"code":-32001,"messag
 
 How it works:
 
-- The token is an HS256 JWT with a `role` claim, checked with `jose` with the algorithm pinned (so `alg: none` tokens fail). The secret comes from `JWT_SECRET` and falls back to `dev-secret` for local runs. Missing or bad token gets a 401.
+- The token is an HS256 JWT with a `role` claim, checked with `jose` with the algorithm pinned (so `alg: none` tokens fail), plus issuer and audience so a token minted for something else is refused. The secret comes from `JWT_SECRET` and falls back to `dev-secret` for local runs, with a warning at startup. `JWT_ISSUER` and `JWT_AUDIENCE` default to `demo-issuer` and `mcp-gateway`. Missing or bad token gets a 401.
 - A denied call gets HTTP 200 with the `-32001` JSON-RPC error. I tried 403 first, but the SDK client then throws a generic HTTP error and the JSON-RPC code is lost. With 200 the caller gets an `McpError` with code `-32001`.
 - Everything else is forwarded as is: SSE responses are streamed through, GET and DELETE pass, and so do the session headers. The client's `Authorization` header is not sent downstream.
 - Batches: the SDK server still accepts JSON arrays, so only looking at `body.method` would let an admin call ride along with a `tools/list`. Every message gets checked and a batch with a denied call is refused as a whole.
 - The gateway forwards the JSON it parsed, not the raw bytes. Otherwise a body with two `name` keys could be read one way here and another way downstream.
-- A tool name that isn't a plain string is treated as an admin call for non admins.
+- The `admin_` check ignores case and leading spaces, and a tool name that isn't a plain string is treated as an admin call for non admins. Denials are logged with the token subject.
+- A client that drops the connection halfway through sending a body just gets ignored. Early on this crashed the whole gateway.
 - `tools/list` is passed through untouched like the task says, so viewers still see the admin tools listed. Hiding them would be easy to add.
