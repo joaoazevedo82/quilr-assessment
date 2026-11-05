@@ -1,3 +1,4 @@
+rm package.json
 npm init -y
 npm pkg set type=module
 npm pkg set "engines.node=>=24"
