@@ -7,6 +7,8 @@ const downstream = process.env.DOWNSTREAM_URL ?? 'http://localhost:8081'
 const secret = new TextEncoder().encode(process.env.JWT_SECRET ?? 'dev-secret')
 const maxBody = 1024 * 1024
 
+if (!process.env.JWT_SECRET) console.warn('JWT_SECRET is not set, using dev-secret. Anyone can mint tokens, so keep this local')
+
 const rpcError = (id: unknown, code: number, message: string) => ({ jsonrpc: '2.0', id: id ?? null, error: { code, message } })
 
 function reply(res: ServerResponse, status: number, body: unknown, headers = {}) {
