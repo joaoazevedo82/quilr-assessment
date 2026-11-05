@@ -4,10 +4,10 @@ import { fileURLToPath } from 'node:url'
 
 const windowMs = 60_000
 
-const db = new DatabaseSync(process.env.DB_PATH ?? fileURLToPath(new URL('gateway.db', import.meta.url)))
+// timeout here instead of a pragma, the switch to WAL below already needs it when two processes open a new file
+const db = new DatabaseSync(process.env.DB_PATH ?? fileURLToPath(new URL('gateway.db', import.meta.url)), { timeout: 5000 })
 db.exec(`
   PRAGMA journal_mode = WAL;
-  PRAGMA busy_timeout = 5000;
   -- full sync costs an fsync per commit (30 ms here), losing the last few usage rows on power loss is fine
   PRAGMA synchronous = NORMAL;
   CREATE TABLE IF NOT EXISTS tenants (key_hash TEXT PRIMARY KEY, name TEXT NOT NULL, tokens_per_min INTEGER NOT NULL);
