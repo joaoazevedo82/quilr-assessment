@@ -17,12 +17,12 @@ function reply(res: ServerResponse, status: number, body: unknown, headers = {})
   res.writeHead(status, { 'content-type': 'application/json', ...headers }).end(JSON.stringify(body))
 }
 
-async function roleOf(auth?: string) {
+async function userOf(auth?: string) {
   const token = auth?.match(/^Bearer (\S+)$/i)?.[1]
   if (!token) return
   try {
     const { payload } = await jwtVerify(token, secret, { algorithms: ['HS256'], issuer, audience })
-    return typeof payload.role === 'string' ? payload.role : undefined
+    return typeof payload.role === 'string' ? { role: payload.role, sub: payload.sub } : undefined
   } catch {
     return
   }
@@ -64,8 +64,8 @@ function forward(req: IncomingMessage, res: ServerResponse, body?: string) {
 }
 
 createServer(async (req, res) => {
-  const role = await roleOf(req.headers.authorization)
-  if (!role) return reply(res, 401, rpcError(null, -32000, 'Missing or invalid bearer token'), { 'www-authenticate': 'Bearer error="invalid_token"' })
+  const user = await userOf(req.headers.authorization)
+  if (!user) return reply(res, 401, rpcError(null, -32000, 'Missing or invalid bearer token'), { 'www-authenticate': 'Bearer error="invalid_token"' })
 
   if (req.method !== 'POST') return forward(req, res)
 
@@ -91,8 +91,8 @@ createServer(async (req, res) => {
 
   // every message of a batch is checked, and a batch with one denied call is refused as a whole
   const msgs = Array.isArray(body) ? body : [body]
-  if (role !== 'admin' && msgs.some(isAdminCall)) {
-    console.log(`denied ${msgs.filter(isAdminCall).map((m) => m.params?.name).join(', ')} for role ${role}`)
+  if (user.role !== 'admin' && msgs.some(isAdminCall)) {
+    console.log(`denied ${msgs.filter(isAdminCall).map((m) => m.params?.name).join(', ')} for ${user.sub} (role ${user.role})`)
     const errs = msgs.map((m) => rpcError(m?.id, -32001, 'Unauthorized Tool Call'))
     return reply(res, 200, Array.isArray(body) ? errs : errs[0])
   }
