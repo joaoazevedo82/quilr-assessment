@@ -41,8 +41,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   })),
 }))
 
-server.setRequestHandler(CallToolRequestSchema, async (req) => {
-  const { name, arguments: args } = req.params
+// loose schema so malformed params get the sdk's -32602 check instead of failing the strict parse with -32603
+server.setRequestHandler(z.looseObject({ method: z.literal('tools/call') }), async (req) => {
+  const { name, arguments: args } = CallToolRequestSchema.parse(req).params
   if (!Object.hasOwn(tools, name)) throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${name}`)
 
   const parsed = tools[name as keyof typeof tools].schema.safeParse(args ?? {})
