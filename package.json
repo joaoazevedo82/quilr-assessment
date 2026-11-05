@@ -1,4 +1,9 @@
-rm package.json
-npm init -y
-npm pkg set type=module
-npm pkg set "engines.node=>=24"
+{
+  "name": "quilr-assessment",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  }
+}
