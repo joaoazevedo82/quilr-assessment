@@ -20,7 +20,8 @@
     "task3:gateway": "node task3-pii-stream/gateway.ts",
     "task4:tenant": "node task4-rate-limit/add-tenant.ts",
     "task4:primary": "node task4-rate-limit/mock-provider.ts primary 8101",
-    "task4:secondary": "node task4-rate-limit/mock-provider.ts secondary 8102"
+    "task4:secondary": "node task4-rate-limit/mock-provider.ts secondary 8102",
+    "task4:gateway": "node task4-rate-limit/gateway.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
